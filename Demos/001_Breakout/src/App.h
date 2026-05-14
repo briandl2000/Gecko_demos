@@ -17,14 +17,18 @@
 #include <gecko/runtime/tracking_allocator.h>
 #include <optional>
 
-namespace gecko::examples::graphics_example {
+namespace gk = gecko;
+using u8 = gk::u8;
+using u16 = gk::u16;
+using u32 = gk::u32;
+using u64 = gk::u64;
+using i8 = gk::i8;
+using i16 = gk::i16;
+using i32 = gk::i32;
+using i64 = gk::i64;
+using f32 = gk::f32;
+using f64 = gk::f64;
 
-/// Two-window Vulkan demo with a triangle, a fullscreen blit and a
-/// compute-driven plasma. Boots the same service stack as
-/// `platform_example` plus `gecko::graphics`.
-///
-/// Owns every GPU resource as a member so destruction order matches
-/// the device lifetime.
 class App
 {
 public:
@@ -35,96 +39,67 @@ public:
 
   [[nodiscard]] bool IsValid() const noexcept
   {
-    return m_Engine.has_value() && m_Device != nullptr && m_Slots[0].Handle.IsValid() && m_Slots[1].Handle.IsValid();
+    return m_Engine.has_value() && m_Device != nullptr;
   }
 
-  /// Enters the main loop. Returns the process exit code.
   int Run();
 
 private:
-  static constexpr ::gecko::u32 OffscreenW = 1280;
-  static constexpr ::gecko::u32 OffscreenH = 720;
-  static constexpr ::gecko::graphics::DataFormat OffscreenFmt = ::gecko::graphics::DataFormat::R8G8B8A8_UNORM;
-
-  class ExampleModule final : public ::gecko::IModule
+  class BreakoutModule final : public gk::IModule
   {
   public:
-    [[nodiscard]] ::gecko::Label RootLabel() const noexcept override;
-    [[nodiscard]] bool Startup(::gecko::IModuleRegistry&) noexcept override;
-    void Shutdown(::gecko::IModuleRegistry&) noexcept override;
+    [[nodiscard]] gk::Label RootLabel() const noexcept override;
+    [[nodiscard]] bool Startup(gk::IModuleRegistry&) noexcept override;
+    void Shutdown(gk::IModuleRegistry&) noexcept override;
   };
 
-  /// One swapchain + queued resize for one of the two demo windows.
-  struct WindowSlot
-  {
-    ::gecko::platform::WindowHandle Handle {};
-    ::gecko::graphics::Swapchain SC {};
-    bool ResizeDirty = false;
-    ::gecko::u32 ResizeW = 0;
-    ::gecko::u32 ResizeH = 0;
-  };
+  static gk::graphics::GraphicsConfig MakeGraphicsConfig() noexcept;
 
-  static ::gecko::graphics::GraphicsConfig MakeGraphicsConfig() noexcept;
-
-  bool CreateWindows();
-  bool CreateSwapchains();
+  bool CreateWindow();
+  bool CreateSwapchain();
   bool CreateRenderResources();
   bool CreatePipelines();
-  void CreateProfilingResources();
   void ConfigureProfiler();
   void SubscribeEvents();
 
-  void HandlePendingResizes();
-  void RecordComputePass(::gecko::f32 time);
-  void RecordTrianglePass(::gecko::graphics::ICommandList& cmd, ::gecko::f32 time);
-  void RecordBlitPass(::gecko::graphics::ICommandList& cmd, ::gecko::graphics::FrameContext (&frames)[2],
-                      ::gecko::f32 time);
+  void RecordTrianglePass(gk::graphics::ICommandList& cmd, f32 time, gk::graphics::RenderTarget target);
   void RenderFrame();
   void Update();
-  void OnKey(::gecko::platform::KeyCode key);
-  void PrintHudIfDue(::gecko::u32 drawCalls);
+  void OnKey(gk::platform::KeyCode key);
+  void PrintHudIfDue(f32 drawCalls);
 
-  // Services / modules / sinks. Each module owns its production
-  // defaults internally via its default ctor.
-  ::gecko::runtime::TrackingAllocator m_Allocator;
-  ::gecko::AllocatorScope m_AllocScope {m_Allocator};
+  gk::runtime::TrackingAllocator m_Allocator;
+  gk::AllocatorScope m_AllocScope {m_Allocator};
 
-  ::gecko::runtime::RuntimeModule m_RuntimeModule;
-  ::gecko::platform::PlatformModule m_PlatformModule;
-  ::gecko::graphics::GraphicsModule m_GraphicsModule;
-  ExampleModule m_AppModule;
+  gk::runtime::RuntimeModule m_RuntimeModule;
+  gk::platform::PlatformModule m_PlatformModule;
+  gk::graphics::GraphicsModule m_GraphicsModule;
+  BreakoutModule m_AppModule;
 
-  ::std::optional<::gecko::Engine> m_Engine;
-  ::std::optional<::gecko::runtime::StandardLogSinks> m_LogSinks;
+  ::std::optional<gk::Engine> m_Engine;
+  ::std::optional<gk::runtime::StandardLogSinks> m_LogSinks;
 
-  // Graphics resources -- declared after m_Engine so they are destroyed
-  // before the engine tears the GraphicsModule (and its device) down.
-  ::gecko::graphics::GraphicsDevice* m_Device = nullptr;
-  ::gecko::graphics::IGpuSampler* m_GpuSampler = nullptr;
-  WindowSlot m_Slots[2] {};
+  gk::graphics::GraphicsDevice* m_Device = nullptr;
+  gk::graphics::IGpuSampler* m_GpuSampler = nullptr;
 
-  ::gecko::graphics::RenderTarget m_OffscreenRT {};
-  ::gecko::graphics::RenderTarget m_DepthRT {};
-  ::gecko::graphics::Texture m_PlasmaTex[2] {};
-  ::gecko::graphics::Buffer m_VertexBuffer {};
-  ::gecko::graphics::Buffer m_IndirectBuffer {};
-  ::gecko::graphics::Sampler m_BlitSampler {};
-  ::gecko::graphics::QueryPool m_TimestampPool {};
+  gk::platform::WindowHandle m_WindowHandle {};
+  gk::graphics::Swapchain m_SwapChain {};
+  bool m_ResizeDirty = false;
+  u32 m_ResizeW = 0;
+  u32 m_ResizeH = 0;
 
-  ::gecko::graphics::GraphicsPipeline m_TrianglePipeline {};
-  ::gecko::graphics::GraphicsPipeline m_BlitPipeline {};
-  ::gecko::graphics::ComputePipeline m_PlasmaPipeline {};
+  gk::graphics::Buffer m_VertexBuffer {};
+  gk::graphics::Buffer m_IndexBuffer {};
 
-  // Event subscriptions kept alive for Run().
-  ::gecko::EventSubscription m_CloseSub {};
-  ::gecko::EventSubscription m_ResizeSub {};
-  ::gecko::EventSubscription m_KeySub {};
+  gk::graphics::GraphicsPipeline m_TrianglePipeline {};
+
+  gk::EventSubscription m_CloseSub {};
+  gk::EventSubscription m_ResizeSub {};
+  gk::EventSubscription m_KeySub {};
 
   // Loop state.
   bool m_Running = true;
   ::std::chrono::steady_clock::time_point m_StartTime {};
-  ::gecko::u64 m_FrameIndex = 0;
-  ::gecko::u64 m_LastHudPrintNs = 0;
+  u64 m_FrameIndex = 0;
+  u64 m_LastHudPrintNs = 0;
 };
-
-}  // namespace gecko::examples::graphics_example

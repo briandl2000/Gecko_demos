@@ -20,6 +20,10 @@ target_link_libraries(Breakout PRIVATE
     Gecko::Graphics     # remove if you don't need the renderer
 )
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  target_compile_options(Breakout PRIVATE -g -O0)
+endif()
+
 # On Linux, the executable needs to look in its own directory for the
 # Gecko .so files we copy next to it below.
 if(UNIX AND NOT APPLE)
@@ -58,12 +62,9 @@ endif()
 
 gecko_add_shaders(
   TARGET    Breakout
-  NAMESPACE breakout
+  NAMESPACE shaders
   HEADER    shaders.h
   SHADERS
     triangle.vert.hlsl=TriangleVert
     triangle.frag.hlsl=TriangleFrag
-    fullscreen.vert.hlsl=FullscreenVert
-    fullscreen.frag.hlsl=FullscreenFrag
-    plasma.comp.hlsl=PlasmaComp
 )
