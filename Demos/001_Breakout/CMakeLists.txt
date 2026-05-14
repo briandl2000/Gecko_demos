@@ -44,7 +44,9 @@ add_custom_command(TARGET Breakout POST_BUILD
 
 # Copy compile_commands.json to the project root so clangd / your editor
 # can find it without extra config.
-if(CMAKE_EXPORT_COMPILE_COMMANDS)
+# Note: This only works with generators that produce compile_commands.json (e.g., Ninja).
+# Visual Studio generators don't generate this file.
+if(CMAKE_EXPORT_COMPILE_COMMANDS AND NOT MSVC_IDE)
   add_custom_target(copy_compile_commands ALL
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_BINARY_DIR}/compile_commands.json"
