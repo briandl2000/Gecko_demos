@@ -1,0 +1,11 @@
+# Build directories anywhere
+**/build/
+
+# Compile commands anywhere
+**/compile_commands.json
+
+# Cache directories anywhere
+**/.cache/
+.cache/
+
+**/log.txt
