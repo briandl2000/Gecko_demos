@@ -1,8 +1,11 @@
 #include "App.h"
+#include "Entity.h"
 
-#include "shaders.h"
 
-#include <cmath>
+#include <chrono>
+#include <gecko/math/vector.h>
+#include <gecko/platform/window.h>
+#include <gecko/platform/platform_module.h>
 #include <gecko/core/labels.h>
 #include <gecko/core/services.h>
 #include <gecko/core/services/log.h>
@@ -11,28 +14,18 @@
 #include <gecko/core/utility/thread.h>
 #include <gecko/core/version.h>
 #include <gecko/graphics/graphics_types.h>
+#include <gecko/math/matrix.h>
+#include <gecko/platform/input.h>
+#include <gecko/platform/input_codes.h>
 #include <gecko/platform/platform_events.h>
 #include <gecko/platform/windows_interface.h>
+#include <gecko/platform/input.h>
 #include <utility>
 
 namespace
 {
-
   constexpr gk::Label App_Label = gk::MakeLabel("app.breakout");
   constexpr gk::Label Main_Label = gk::MakeLabel("app.breakout.main");
-
-  struct Vertex
-  {
-    float Position[3];
-    float Color[3];
-  };
-
-  constexpr Vertex TriangleVertices[] = {
-      {{0.0F, 0.5F, 0.0F}, {1.0F, 0.0F, 0.0F}},
-      {{0.5F, -0.5F, 0.0F}, {0.0F, 1.0F, 0.0F}},
-      {{-0.5F, -0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}},
-  };
-
 }
 
 gk::Label App::BreakoutModule::RootLabel() const noexcept
@@ -79,9 +72,7 @@ App::App() : m_GraphicsModule(MakeGraphicsConfig())
     return;
   if (!CreateSwapchain())
     return;
-  if (!CreateRenderResources())
-    return;
-  if (!CreatePipelines())
+  if(!m_Renderer.Init())
     return;
   SubscribeEvents();
 }
@@ -169,56 +160,6 @@ bool App::CreateSwapchain()
   return true;
 }
 
-bool App::CreateRenderResources()
-{
-  gk::graphics::VertexBufferDesc vertexBufferDesc;
-  vertexBufferDesc.NumVertices = 3;
-  vertexBufferDesc.VertexSize = sizeof(Vertex);
-  vertexBufferDesc.Memory = gk::graphics::MemoryType::Dedicated;
-  m_VertexBuffer = m_Device->CreateVertexBuffer(vertexBufferDesc);
-  if (m_VertexBuffer.IsValid())
-  {
-    const auto* raw = reinterpret_cast<const gk::byte*>(TriangleVertices);
-    m_Device->UploadBufferData(m_VertexBuffer, {raw, sizeof(TriangleVertices)});
-  }
-  return true;
-}
-
-bool App::CreatePipelines()
-{
-  gk::graphics::VertexLayout triLayout;
-  triLayout.AddAttribute(gk::graphics::DataFormat::R32G32B32_FLOAT, "a_Position");
-  triLayout.AddAttribute(gk::graphics::DataFormat::R32G32B32_FLOAT, "a_Color");
-
-  gk::graphics::GraphicsPipelineDesc triPDesc;
-  triPDesc.VertexShader = gk::graphics::ShaderCode {
-      .Format = gk::graphics::ShaderFormat::SPIRV,
-      .Bytes = {reinterpret_cast<const gk::byte*>(shaders::TriangleVert), sizeof(shaders::TriangleVert)},
-  };
-  triPDesc.PixelShader = gk::graphics::ShaderCode {
-      .Format = gk::graphics::ShaderFormat::SPIRV,
-      .Bytes = {reinterpret_cast<const gk::byte*>(shaders::TriangleFrag), sizeof(shaders::TriangleFrag)},
-  };
-  triPDesc.Layout = triLayout;
-  triPDesc.NumRenderTargets = 1;
-  triPDesc.RenderTargetFormats[0] = gk::graphics::DataFormat::R8G8B8A8_UNORM;
-  triPDesc.DepthStencilFormat = gk::graphics::DataFormat::D32_FLOAT;
-  triPDesc.Culling = gk::graphics::CullMode::None;
-  triPDesc.PushConstantBytes = 16;
-  triPDesc.DebugName = "TrianglePipeline";
-  m_TrianglePipeline = m_Device->CreateGraphicsPipeline(triPDesc);
-
-  if (!m_TrianglePipeline.IsValid())
-  {
-    GECKO_WARN(Main_Label, "One or more pipelines failed to build - rendering disabled");
-  }
-  else
-  {
-    GECKO_INFO(Main_Label, "Pipelines ready");
-  }
-  return true;
-}
-
 void App::SubscribeEvents()
 {
   m_CloseSub = gk::SubscribeEvent(
@@ -227,20 +168,20 @@ void App::SubscribeEvents()
       this
   );
 
-  // m_ResizeSub = gk::SubscribeEvent(
-  //     gk::platform::events::WindowResized,
-  //     [](void* user, const gk::EventMeta&, gk::EventView view) {
-  //       const auto* payload = static_cast<const gk::platform::events::WindowResizedPayload*>(view.Data());
-  //       auto* self = static_cast<App*>(user);
-  //       if (payload->Width > 0 && payload->Height > 0)
-  //       {
-  //         self->m_SwapChain.Desc.Width = payload->Width;
-  //         self->m_SwapChain.Desc.Height = payload->Height;
-  //         self->m_Device->ResizeSwapchain(self->m_SwapChain);
-  //       }
-  //     },
-  //     this
-  // );
+  m_ResizeSub = gk::SubscribeEvent(
+      gk::platform::events::WindowResized,
+      [](void* user, const gk::EventMeta&, gk::EventView view) {
+        const auto* payload = static_cast<const gk::platform::events::WindowResizedPayload*>(view.Data());
+        auto* self = static_cast<App*>(user);
+        if (payload->Width > 0 && payload->Height > 0)
+        {
+          self->m_SwapChain.Desc.Width = payload->Width;
+          self->m_SwapChain.Desc.Height = payload->Height;
+          self->m_Device->ResizeSwapchain(self->m_SwapChain);
+        }
+      },
+      this
+  );
 
   m_KeySub = gk::SubscribeEvent(
       gk::platform::events::WindowKey,
@@ -270,21 +211,9 @@ void App::OnKey(gk::platform::KeyCode key)
   }
 }
 
-void App::RecordTrianglePass(gk::graphics::ICommandList& cmd, f32 time, gk::graphics::RenderTarget target)
-{
-  cmd.BindPipeline(m_TrianglePipeline);
-  cmd.BindVertexBuffer(m_VertexBuffer);
-  const f32 pc[4] = {time, 0.0F, 0.0F, 0.0F};
-  cmd.SetConstants(0, {reinterpret_cast<const gk::byte*>(pc), sizeof(pc)});
-  cmd.Draw(3);
-}
-
 void App::RenderFrame()
 {
   GECKO_SCOPE_ALWAYS_NAMED(Main_Label, "renderFrame");
-
-  if (!m_TrianglePipeline.IsValid())
-    return;
 
   gk::graphics::FrameContext frame {};
   if (m_SwapChain.IsValid())
@@ -317,10 +246,13 @@ void App::RenderFrame()
     cmd->SetViewport(0.0F, 0.0F, static_cast<f32>(width), static_cast<f32>(height));
     cmd->SetScissor(0, 0, width, height);
 
-    const f32 time =
-        ::std::chrono::duration<f32>(::std::chrono::steady_clock::now() - m_StartTime).count();
+    gm::Float4x4 viewProj = m_Camera.GetViewProjection();
+    m_Renderer.BeginRender(cmd.get(), &viewProj);
 
-    RecordTrianglePass(*cmd, time, frame.BackBuffer);
+    for (auto e : m_Entities)
+    {
+      e->Render(&m_Renderer);
+    }
 
     cmd->EndRendering();
 
@@ -369,12 +301,54 @@ void App::PrintHudIfDue(f32 drawCalls)
              static_cast<unsigned long long>(live / 1024), static_cast<unsigned long long>(m_FrameIndex));
 }
 
+void App::Tick(f32 dt)
+{
+  GECKO_SCOPE_ALWAYS_NAMED(Main_Label, "tick");
+
+  gk::platform::Extent2D windowSize = gk::platform::GetWindows()->GetClientSize(m_WindowHandle);
+  u32 width = windowSize.Width;
+  u32 height = windowSize.Height;
+
+  m_Camera.Update(dt, static_cast<f32>(width), static_cast<f32>(height));
+
+
+  for (auto e : m_Entities)
+  {
+    e->BeginCollisionChecks();
+  }
+  for (auto e : m_Entities)
+  {
+    for (auto other : m_Entities)
+    {
+      e->CheckCollision(other);
+    }
+  }
+
+  for (auto e : m_Entities)
+  {
+    e->Update(dt);
+  }
+
+}
+
 void App::Update()
 {
   GECKO_SCOPE_ALWAYS_NAMED(Main_Label, "frame");
+  static f32 lastTime = ::std::chrono::duration<f32>(::std::chrono::steady_clock::now().time_since_epoch()).count();
+  f32 currentTime = ::std::chrono::duration<f32>(::std::chrono::steady_clock::now().time_since_epoch()).count();
+  f32 dt = currentTime - lastTime;
+  lastTime = currentTime;
+
   (void)gk::DispatchEvents();
+  Tick(dt);
   RenderFrame();
   GECKO_FRAME(Main_Label, "Frame");
+}
+
+void App::Start()
+{
+  m_Entities.push_back(new Paddle());
+  m_Entities.push_back(new Ball());
 }
 
 int App::Run()
@@ -386,10 +360,10 @@ int App::Run()
   GECKO_SCOPE_ALWAYS_NAMED(Main_Label, "AppRun");
 
   GECKO_INFO(Main_Label, "Entering frame loop - Escape or close to quit");
-  m_StartTime = ::std::chrono::steady_clock::now();
 
   gk::platform::SetModalFrameCallback([](void* ud) { static_cast<App*>(ud)->Update(); }, this);
 
+  Start();
   while (m_Running)
   {
     gk::platform::PumpEvents();

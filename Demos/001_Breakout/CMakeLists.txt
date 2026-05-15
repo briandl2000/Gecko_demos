@@ -10,7 +10,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(GECKO_VERSION "0.0.0-alpha.3-dev.20260514122359")   # <-- change me
 include(cmake/FetchGecko.cmake)
 
-add_executable(Breakout src/main.cpp src/App.cpp)
+add_executable(Breakout
+  src/main.cpp
+  src/App.cpp
+  src/Camera.cpp
+  src/Renderer.cpp
+  src/Entity.cpp
+  src/overwrite_new.cpp
+)
 target_link_libraries(Breakout PRIVATE
     Gecko::Core
     Gecko::CoreServices
@@ -65,6 +72,6 @@ gecko_add_shaders(
   NAMESPACE shaders
   HEADER    shaders.h
   SHADERS
-    triangle.vert.hlsl=TriangleVert
-    triangle.frag.hlsl=TriangleFrag
+    rect.vert.hlsl=RectVert
+    rect.frag.hlsl=RectFrag
 )
