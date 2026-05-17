@@ -42,6 +42,7 @@ struct DrawCommand
   gm::Float4x4 Model;
   gm::Float3 Color;
   gm::Float2 Size;
+  f32 Alpha;
 };
 
 class Renderer
@@ -56,10 +57,10 @@ public:
 
   void DrawToScreen(gk::graphics::ICommandList* cmd);
 
-  void FillRect(gm::Float2 position, gm::Float3 Color, gm::Float2 size = {1., 1.}, f32 rotation = 0.);
-  void FillCircle(gm::Float2 position, gm::Float3 Color, gm::Float2 size = {1., 1.});
-  void StrokeRect(gm::Float2 position, gm::Float3 Color, gm::Float2 size = {1., 1.}, f32 rotation = 0.);
-  void StrokeCircle(gm::Float2 position, gm::Float3 Color, gm::Float2 size = {1., 1.});
+  void FillRect(gm::Float2 position, gm::Float3 Color, gm::Float2 size = {1., 1.}, f32 rotation = 0., f32 alpha = 1.);
+  void FillCircle(gm::Float2 position, gm::Float3 Color, gm::Float2 size = {1., 1.}, f32 alpha = 1.);
+  void StrokeRect(gm::Float2 position, gm::Float3 Color, gm::Float2 size = {1., 1.}, f32 rotation = 0., f32 alpha = 1.);
+  void StrokeCircle(gm::Float2 position, gm::Float3 Color, gm::Float2 size = {1., 1.}, f32 alpha = 1.);
 private:
   static constexpr u32 MaxCommands {1028*4};
 
@@ -97,7 +98,7 @@ private:
     u32 Offset {0};
   };
 
-  void WriteDrawCommand(DrawCommandList& CommandList, gm::Float2 position, gm::Float3 Color, gm::Float2 size, f32 rotation);
+  void WriteDrawCommand(DrawCommandList& CommandList, gm::Float2 position, gm::Float3 Color, gm::Float2 size, f32 rotation, f32 alpha);
 
   DrawCommandList m_FillRectCommands;
   DrawCommandList m_FillCircleCommands;

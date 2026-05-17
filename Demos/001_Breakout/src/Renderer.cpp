@@ -18,20 +18,21 @@ namespace
 
   constexpr Vertex RectVertices[] = {
       {{-0.5, -0.5}},
-      {{ 0.5, -0.5}},
       {{-0.5,  0.5}},
+      {{ 0.5, -0.5}},
       {{ 0.5,  0.5}}
   };
 
   constexpr u32 RectIndices[] = {
-    0, 1, 2, 1, 3, 2
+    0, 1, 2, 2, 1, 3
   };
   struct pushConst {
     gm::Float4x4 Model {};
     gm::Float3 Color { };
     f32 StrokeWidth {0.04};
     gm::Float2 Size;
-    gm::Float2 Padding;
+    f32 alpha {1.};
+    f32 Padding;
   };
 
   struct SceneData
@@ -109,6 +110,7 @@ void Renderer::EndRender()
       pc.Model = list.DrawCommands[i].Model;
       pc.Color = list.DrawCommands[i].Color;
       pc.Size = list.DrawCommands[i].Size;
+      pc.alpha = list.DrawCommands[i].Alpha;
       m_Cmd->SetConstants(0, {reinterpret_cast<const gk::byte*>(&pc), sizeof(pc)});
       m_Cmd->DrawIndexed(m_RectIndexBuffer.IndexDesc.NumIndices);
     }
@@ -231,7 +233,7 @@ bool Renderer::CreatePipelines()
   pipelineDesc.NumPipelineResources = 1;
   pipelineDesc.NumRenderTargets = 1;
   pipelineDesc.RenderTargetFormats[0] = gk::graphics::DataFormat::R8G8B8A8_UNORM;
-  pipelineDesc.Culling = gk::graphics::CullMode::None;
+  pipelineDesc.Culling = gk::graphics::CullMode::Back;
   pipelineDesc.PipelineResources[0] =
   {
     .Type = gk::graphics::ResourceType::ConstantBuffer,
@@ -337,7 +339,7 @@ bool Renderer::CreatePipelines()
 
 // Draw commands ------------------------------
 
-void Renderer::WriteDrawCommand(DrawCommandList& CommandList, gm::Float2 position, gm::Float3 Color, gm::Float2 size, f32 rotation)
+void Renderer::WriteDrawCommand(DrawCommandList& CommandList, gm::Float2 position, gm::Float3 Color, gm::Float2 size, f32 rotation, f32 alpha)
 {
   if(!m_ViewProjection || !m_Cmd)
   {
@@ -356,24 +358,25 @@ void Renderer::WriteDrawCommand(DrawCommandList& CommandList, gm::Float2 positio
   CommandList.DrawCommands[index].Color = Color;
   CommandList.DrawCommands[index].Model = model;
   CommandList.DrawCommands[index].Size = size;
+  CommandList.DrawCommands[index].Alpha = alpha;
 }
 
-void Renderer::FillRect(gm::Float2 position, gm::Float3 Color, gm::Float2 size, f32 rotation)
+void Renderer::FillRect(gm::Float2 position, gm::Float3 Color, gm::Float2 size, f32 rotation, f32 alpha)
 {
-  WriteDrawCommand(m_FillRectCommands, position, Color, size, rotation);
+  WriteDrawCommand(m_FillRectCommands, position, Color, size, rotation, alpha);
 }
 
-void Renderer::FillCircle(gm::Float2 position, gm::Float3 Color, gm::Float2 size)
+void Renderer::FillCircle(gm::Float2 position, gm::Float3 Color, gm::Float2 size, f32 alpha)
 {
-  WriteDrawCommand(m_FillCircleCommands, position, Color, size, 0.);
+  WriteDrawCommand(m_FillCircleCommands, position, Color, size, 0., alpha);
 }
 
-void Renderer::StrokeRect(gm::Float2 position, gm::Float3 Color, gm::Float2 size, f32 rotation)
+void Renderer::StrokeRect(gm::Float2 position, gm::Float3 Color, gm::Float2 size, f32 rotation, f32 alpha)
 {
-  WriteDrawCommand(m_StrokeRectCommands, position, Color, size, 0.);
+  WriteDrawCommand(m_StrokeRectCommands, position, Color, size, rotation, alpha);
 }
 
-void Renderer::StrokeCircle(gm::Float2 position, gm::Float3 Color, gm::Float2 size)
+void Renderer::StrokeCircle(gm::Float2 position, gm::Float3 Color, gm::Float2 size, f32 alpha)
 {
-  WriteDrawCommand(m_StrokeCircleCommands, position, Color, size, 0.);
+  WriteDrawCommand(m_StrokeCircleCommands, position, Color, size, 0., alpha);
 }

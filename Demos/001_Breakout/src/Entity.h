@@ -30,6 +30,7 @@ public:
   virtual ~Entity() = default;
 
   virtual void Render(Renderer* renderer);
+  virtual void Tick(f32 dt) {};
   virtual void Update(f32 dt) {};
   virtual EntityType GetType() { return EntityType::None; }
 
@@ -56,7 +57,7 @@ class Paddle : public Entity
 public:
   Paddle();
 
-  virtual void Update(f32 dt) override;
+  virtual void Tick(f32 dt) override;
   virtual EntityType GetType() override { return EntityType::Paddle; }
 
   f32 Speed {10.f};
@@ -71,11 +72,19 @@ public:
   Ball();
 
   virtual void Render(Renderer* renderer) override;
-  virtual void Update(f32 dt) override;
+  virtual void Tick(f32 dt) override;
   virtual EntityType GetType() override { return EntityType::Ball; }
 
 private:
-  void HandleCollision(const CollisionInfo& collision);
+void HandleCollision(const CollisionInfo& collision);
+
+  std::vector<gm::Float2> m_PreviousPositions;
+  u32 m_PreviousPositionsHead = 0;
+  u32 m_PreviousPositionsCount = 0;
+
+  static constexpr u32 MaxPreviousPositions = 20;
+
+  f32 m_PositionSampleTimer = 0.0f;
 
   gm::Float2 m_Velocity {};
 };
@@ -86,7 +95,7 @@ public:
   Brick() = default;
   Brick(gm::Float2 position);
 
-  virtual void Update(f32 dt) override;
+  virtual void Tick(f32 dt) override;
   virtual EntityType GetType() override { return EntityType::Brick; }
 
 private:

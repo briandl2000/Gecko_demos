@@ -236,7 +236,7 @@ int App::Run()
   return 0;
 }
 
-constexpr f32 FIXED_DT = 1.0f/60.f;
+constexpr f32 FIXED_DT = 1.0f/240.f;
 
 void App::Update()
 {

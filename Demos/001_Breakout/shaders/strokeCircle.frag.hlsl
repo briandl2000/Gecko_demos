@@ -13,7 +13,7 @@ float4 main(PSInput input) : SV_Target
     // Keep pixels inside outer circle but outside inner circle.
     float sdf = max(outer, -inner);
 
-    float alpha = calcAlpha(sdf);
+    float alpha = clamp(0, g_Push.alpha, calcAlpha(sdf));
 
     return float4(input.Color, alpha);
 }

@@ -14,7 +14,7 @@ float4 main(PSInput input) : SV_Target
     // Keep pixels inside the outer rect but outside the inner rect.
     float sdf = max(outer, -inner);
 
-    float alpha = calcAlpha(sdf);
+    float alpha = clamp(0, g_Push.alpha, calcAlpha(sdf));
 
     return float4(input.Color, alpha);
 }

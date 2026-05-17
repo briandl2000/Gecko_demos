@@ -82,7 +82,7 @@ void Paddle::HandleCollision(const CollisionInfo& collision)
   }
 }
 
-void Paddle::Update(f32 dt)
+void Paddle::Tick(f32 dt)
 {
   gm::Float2 movement {};
   if(gk::platform::GetInput()->IsKeyDown(gk::platform::KeyCode::D))
@@ -115,10 +115,29 @@ Ball::Ball()
   Size = {0.3, 0.3};
   Color = Colors::paddle_color;
   m_Velocity = {.3, -2.f};
+  m_Velocity = gm::Normalized(m_Velocity) * 5.;
+
+  m_PreviousPositions.resize(MaxPreviousPositions);
 }
 
 void Ball::Render(Renderer* renderer)
 {
+  for (u32 i = 0; i < m_PreviousPositionsCount; i++)
+  {
+      u32 newestIndex =
+          (m_PreviousPositionsHead + MaxPreviousPositions - 1) % MaxPreviousPositions;
+
+      u32 index =
+          (newestIndex + MaxPreviousPositions - i) % MaxPreviousPositions;
+
+      gm::Float2 ghostPos = m_PreviousPositions[index];
+
+      f32 age = (f32)i / (f32)m_PreviousPositionsCount;
+      f32 alpha = (1.0f - age) * 0.4f;
+
+      renderer->FillCircle(ghostPos, Color, Size*(1.0f - age), alpha);
+  }
+
   renderer->FillCircle(Position, Color, Size);
 }
 
@@ -157,7 +176,7 @@ void Ball::HandleCollision(const CollisionInfo& collision)
   }
 }
 
-void Ball::Update(f32 dt)
+void Ball::Tick(f32 dt)
 {
   for(const auto collision : m_LastCollisionBounds)
   {
@@ -165,6 +184,20 @@ void Ball::Update(f32 dt)
   }
 
   Position = Position + m_Velocity * dt;
+
+  m_PositionSampleTimer += dt;
+
+  if (m_PositionSampleTimer >= 0.04f)
+  {
+    m_PreviousPositions[m_PreviousPositionsHead] = Position;
+
+    m_PreviousPositionsHead = (m_PreviousPositionsHead + 1) % MaxPreviousPositions;
+
+    if (m_PreviousPositionsCount < MaxPreviousPositions)
+        m_PreviousPositionsCount++;
+
+    m_PositionSampleTimer = 0.0f;
+  }
 }
 
 Brick::Brick(gm::Float2 postion)
@@ -174,7 +207,7 @@ Brick::Brick(gm::Float2 postion)
   Color = Colors::brick_normal;
 }
 
-void Brick::Update(f32 dt)
+void Brick::Tick(f32 dt)
 {
   for(const auto collision : m_LastCollisionBounds)
   {

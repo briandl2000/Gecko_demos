@@ -82,7 +82,7 @@ void GameScene::Tick(f32 dt)
 
   for (auto e : m_Entities)
   {
-    e->Update(dt);
+    e->Tick(dt);
   }
 
   m_Entities.erase(
@@ -108,11 +108,11 @@ SceneRequest GameScene::Update(f32 dt, const gk::platform::Extent2D& windowSize)
   f32 zoom = 1.f;
   if(gk::platform::GetInput()->IsKeyDown(gk::platform::KeyCode::Up))
   {
-      zoom -= 0.1*dt;
+      zoom -= 0.9*dt;
   }
   if(gk::platform::GetInput()->IsKeyDown(gk::platform::KeyCode::Down))
   {
-      zoom += 0.1*dt;
+      zoom += 0.9*dt;
   }
   m_Camera.Zoom *= zoom;
 

@@ -11,7 +11,8 @@ struct PushConstants
   float2 Size;
 
   // Padding so the C++ side can safely align this to 16-byte boundaries.
-  float2 _Padding;
+  float alpha;
+  float _Padding;
 };
 
 struct VSInput

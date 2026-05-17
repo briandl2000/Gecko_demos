@@ -7,7 +7,7 @@ float4 main(PSInput input) : SV_Target
 
     float sdf = sdCircle(input.LocalPos, radius);
 
-    float alpha = calcAlpha(sdf);
+    float alpha = clamp(0, g_Push.alpha, calcAlpha(sdf));
 
     return float4(input.Color, alpha);
 }

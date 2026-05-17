@@ -49,7 +49,7 @@ void GameOverScene::Tick(f32 dt)
 
   for (auto e : m_Entities)
   {
-    e->Update(dt);
+    e->Tick(dt);
   }
 
   m_Entities.erase(

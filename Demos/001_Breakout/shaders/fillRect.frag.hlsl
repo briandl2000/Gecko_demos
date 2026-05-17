@@ -6,7 +6,7 @@ float4 main(PSInput input) : SV_Target
 
     float sdf = sdBox(input.LocalPos, halfSize);
 
-    float alpha = calcAlpha(sdf);
+    float alpha = clamp(0, g_Push.alpha, calcAlpha(sdf));
 
     return float4(input.Color, alpha);
 }
