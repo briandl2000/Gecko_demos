@@ -5,7 +5,7 @@
 void Camera::Update(f32 dt, f32 width, f32 height)
 {
   f32 aspect = width/height;
-  f32 halfBoxSize = 5.0f;
+  f32 halfBoxSize = 5.0f * Zoom;
 
   f32 horizontal = halfBoxSize * aspect;
   f32 vertical = halfBoxSize;

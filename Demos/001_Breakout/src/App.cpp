@@ -1,8 +1,13 @@
 #include "App.h"
 #include "Entity.h"
+#include "Scene.h"
+#include "Scenes/GameOverScene.h"
+#include "Scenes/GameScene.h"
+#include "Scenes/MainMenuScene.h"
 
 
 #include <chrono>
+#include <gecko/core/ptr.h>
 #include <gecko/math/vector.h>
 #include <gecko/platform/window.h>
 #include <gecko/platform/platform_module.h>
@@ -28,18 +33,7 @@ namespace
   constexpr gk::Label Main_Label = gk::MakeLabel("app.breakout.main");
 }
 
-gk::Label App::BreakoutModule::RootLabel() const noexcept
-{
-  return App_Label;
-}
-
-bool App::BreakoutModule::Startup(gk::IModuleRegistry&) noexcept
-{
-  return true;
-}
-
-void App::BreakoutModule::Shutdown(gk::IModuleRegistry&) noexcept
-{}
+// Constructor destructor ------------------------
 
 App::App() : m_GraphicsModule(MakeGraphicsConfig())
 {
@@ -48,7 +42,7 @@ App::App() : m_GraphicsModule(MakeGraphicsConfig())
     return;
   }
 
-  m_Engine = gk::Engine::Create({&m_RuntimeModule, &m_PlatformModule, &m_GraphicsModule, &m_AppModule});
+  m_Engine = gk::Engine::Create({&m_RuntimeModule, &m_PlatformModule, &m_GraphicsModule});
   if (!m_Engine)
   {
     return;
@@ -72,7 +66,7 @@ App::App() : m_GraphicsModule(MakeGraphicsConfig())
     return;
   if (!CreateSwapchain())
     return;
-  if(!m_Renderer.Init())
+  if(!m_Renderer.Init(m_SwapChain.Desc.NumBackBuffers, m_SwapChain.Desc.Width, m_SwapChain.Desc.Height))
     return;
   SubscribeEvents();
 }
@@ -95,6 +89,8 @@ App::~App()
   }
 }
 
+// Creation stuff ------------------------
+
 void App::ConfigureProfiler()
 {
   gk::GetProfiler()->SetMinLevel(gk::ProfLevel::Normal);
@@ -103,6 +99,7 @@ void App::ConfigureProfiler()
     prof->WatchScope("frame", 240);
     prof->WatchScope("frameGPU", 240, gk::ProfSource::GPU);
     prof->WatchScope("renderFrame", 240);
+    prof->WatchScope("tick", 240);
     prof->SetStatsResetIntervalMs(500);
   }
 }
@@ -160,6 +157,8 @@ bool App::CreateSwapchain()
   return true;
 }
 
+// Events stuff ----------------------------
+
 void App::SubscribeEvents()
 {
   m_CloseSub = gk::SubscribeEvent(
@@ -193,6 +192,8 @@ void App::SubscribeEvents()
       },
       this
   );
+
+  gk::platform::SetModalFrameCallback([](void* ud) { static_cast<App*>(ud)->Update(); }, this);
 }
 
 void App::OnKey(gk::platform::KeyCode key)
@@ -209,6 +210,81 @@ void App::OnKey(gk::platform::KeyCode key)
   default:
     break;
   }
+}
+
+// Update stuff ----------------------------
+
+int App::Run()
+{
+  if (!IsValid())
+    return 1;
+
+  GECKO_PUSH_LABEL(Main_Label);
+  GECKO_SCOPE_ALWAYS_NAMED(Main_Label, "AppRun");
+
+  GECKO_INFO(Main_Label, "Entering frame loop - Escape or close to quit");
+
+  Start();
+  while (m_Running)
+  {
+    gk::platform::PumpEvents();
+    Update();
+  }
+
+  gk::platform::SetModalFrameCallback(nullptr, nullptr);
+  GECKO_INFO(Main_Label, "Shutdown complete");
+  return 0;
+}
+
+constexpr f32 FIXED_DT = 1.0f/60.f;
+
+void App::Update()
+{
+  GECKO_SCOPE_ALWAYS_NAMED(Main_Label, "frame");
+  static f32 lastTime = ::std::chrono::duration<f32>(::std::chrono::steady_clock::now().time_since_epoch()).count();
+  f32 currentTime = ::std::chrono::duration<f32>(::std::chrono::steady_clock::now().time_since_epoch()).count();
+  f32 dt = currentTime - lastTime;
+  lastTime = currentTime;
+
+  static f32 accumulator = 0.0f;
+  accumulator += dt;
+
+  (void)gk::DispatchEvents();
+
+  while(accumulator >= FIXED_DT)
+  {
+    Tick(FIXED_DT);
+    accumulator -= FIXED_DT;
+  }
+
+  SceneRequest request = m_Scene->Update(dt, gk::platform::GetWindows()->GetClientSize(m_WindowHandle));
+
+  if(request.type == SceneRequest::Type::Quit)
+  {
+    m_Running = false;
+    return;
+  }
+
+  if(request.type == SceneRequest::Type::Switch)
+  {
+    SwitchScene(request.target);
+    return;
+  }
+
+  RenderFrame();
+  GECKO_FRAME(Main_Label, "Frame");
+}
+
+void App::Start()
+{
+  SwitchScene(SceneID::MainMenu);
+}
+
+void App::Tick(f32 dt)
+{
+  GECKO_SCOPE_ALWAYS_NAMED(Main_Label, "tick");
+
+  m_Scene->Tick(dt);
 }
 
 void App::RenderFrame()
@@ -233,11 +309,13 @@ void App::RenderFrame()
     cmd->AttachGpuSampler(m_GpuSampler, Main_Label);
   }
   {
-
     GECKO_GPU_SCOPE_ALWAYS_NAMED(*cmd, Main_Label, "frameGPU");
+
+    m_Scene->Render(cmd.get(), m_Renderer, frame.FrameIndex);
+
     u32 width = frame.BackBuffer.Desc.Width;
     u32 height = frame.BackBuffer.Desc.Height;
-    gk::graphics::ClearValue clearValue = gk::graphics::ClearValue::RenderTarget(0.08F, 0.08F, 0.12F, 1.0F);
+    gk::graphics::ClearValue clearValue = gk::graphics::ClearValue::RenderTarget(0.18F, 0.18F, 0.3F, 1.0F);
     gk::graphics::BeginRenderingInfo beginRenderInfo = {
         .Colors = {&frame.BackBuffer, 1},
         .ClearColors = {&clearValue, 1},
@@ -246,13 +324,7 @@ void App::RenderFrame()
     cmd->SetViewport(0.0F, 0.0F, static_cast<f32>(width), static_cast<f32>(height));
     cmd->SetScissor(0, 0, width, height);
 
-    gm::Float4x4 viewProj = m_Camera.GetViewProjection();
-    m_Renderer.BeginRender(cmd.get(), &viewProj);
-
-    for (auto e : m_Entities)
-    {
-      e->Render(&m_Renderer);
-    }
+    m_Renderer.DrawToScreen(cmd.get());
 
     cmd->EndRendering();
 
@@ -278,6 +350,43 @@ void App::RenderFrame()
   ++m_FrameIndex;
 }
 
+// Scene Stuff ----------------------------
+
+gk::Unique<Scene> App::CreateScene(SceneID id)
+{
+  switch (id)
+  {
+    case SceneID::MainMenu:
+      return gk::CreateUnique<MainMenuScene>();
+    case SceneID::Game:
+      return gk::CreateUnique<GameScene>();
+    case SceneID::GameOver:
+      return gk::CreateUnique<GameOverScene>();
+    default:
+      break;
+  }
+  GECKO_WARN(App_Label, "Unkown scene type!");
+  return nullptr;
+}
+
+void App::SwitchScene(SceneID id)
+{
+  if(m_Scene)
+  {
+    m_Scene->Stop();
+  }
+
+  m_Scene = CreateScene(id);
+
+  if(m_Scene)
+  {
+    m_Scene->Start();
+  }
+}
+
+
+// Utility stuff --------------------------
+
 void App::PrintHudIfDue(f32 drawCalls)
 {
   auto* prof = gk::GetProfiler();
@@ -291,86 +400,14 @@ void App::PrintHudIfDue(f32 drawCalls)
   const auto frame = prof->GetStats("frame");
   const auto rend = prof->GetStats("renderFrame");
   const auto gpuFrame = prof->GetStats("frameGPU", gk::ProfSource::GPU);
+  const auto tick = prof->GetStats("tick");
   const f64 fps = (frame.AvgNs > 0) ? 1.0e9 / static_cast<f64>(frame.AvgNs) : 0.0;
   const u64 live = m_Allocator.TotalLiveBytes();
   GECKO_INFO(Main_Label,
-             "HUD frame=%.2fms (%.1f fps)  cpu_render=%.2fms  "
-             "gpu_frame=%.3fms  "
-             "alloc_live=%llu KB  frames=%llu",
-             frame.AvgNs / 1.0e6, fps, rend.AvgNs / 1.0e6, gpuFrame.AvgNs / 1.0e6,
-             static_cast<unsigned long long>(live / 1024), static_cast<unsigned long long>(m_FrameIndex));
-}
-
-void App::Tick(f32 dt)
-{
-  GECKO_SCOPE_ALWAYS_NAMED(Main_Label, "tick");
-
-  gk::platform::Extent2D windowSize = gk::platform::GetWindows()->GetClientSize(m_WindowHandle);
-  u32 width = windowSize.Width;
-  u32 height = windowSize.Height;
-
-  m_Camera.Update(dt, static_cast<f32>(width), static_cast<f32>(height));
-
-
-  for (auto e : m_Entities)
-  {
-    e->BeginCollisionChecks();
-  }
-  for (auto e : m_Entities)
-  {
-    for (auto other : m_Entities)
-    {
-      e->CheckCollision(other);
-    }
-  }
-
-  for (auto e : m_Entities)
-  {
-    e->Update(dt);
-  }
-
-}
-
-void App::Update()
-{
-  GECKO_SCOPE_ALWAYS_NAMED(Main_Label, "frame");
-  static f32 lastTime = ::std::chrono::duration<f32>(::std::chrono::steady_clock::now().time_since_epoch()).count();
-  f32 currentTime = ::std::chrono::duration<f32>(::std::chrono::steady_clock::now().time_since_epoch()).count();
-  f32 dt = currentTime - lastTime;
-  lastTime = currentTime;
-
-  (void)gk::DispatchEvents();
-  Tick(dt);
-  RenderFrame();
-  GECKO_FRAME(Main_Label, "Frame");
-}
-
-void App::Start()
-{
-  m_Entities.push_back(new Paddle());
-  m_Entities.push_back(new Ball());
-}
-
-int App::Run()
-{
-  if (!IsValid())
-    return 1;
-
-  GECKO_PUSH_LABEL(Main_Label);
-  GECKO_SCOPE_ALWAYS_NAMED(Main_Label, "AppRun");
-
-  GECKO_INFO(Main_Label, "Entering frame loop - Escape or close to quit");
-
-  gk::platform::SetModalFrameCallback([](void* ud) { static_cast<App*>(ud)->Update(); }, this);
-
-  Start();
-  while (m_Running)
-  {
-    gk::platform::PumpEvents();
-    Update();
-  }
-
-  gk::platform::SetModalFrameCallback(nullptr, nullptr);
-  GECKO_INFO(Main_Label, "Shutdown complete");
-  return 0;
+             "\n\tHUD FRAME STATS:\n\t\tframe=%.2fms (%.1f fps) \n\t\tcpu_render=%.2fms  "
+             "\n\t\tgpu_frame=%.3fms  "
+             "\n\t\ttick=%.3fms  "
+             "\n\t\talloc_live=%llu KB\n",
+             frame.AvgNs / 1.0e6, fps, rend.AvgNs / 1.0e6, gpuFrame.AvgNs / 1.0e6, tick.AvgNs / 1.0e6,
+             static_cast<unsigned long long>(live / 1024));
 }

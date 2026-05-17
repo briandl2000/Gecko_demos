@@ -1,8 +1,8 @@
 #pragma once
 #include "Common.h"
-#include "Camera.h"
 #include "Renderer.h"
-#include "Entity.h"
+#include "Scene.h"
+#include <gecko/core/ptr.h>
 
 class App
 {
@@ -20,27 +20,25 @@ public:
   int Run();
 
 private:
-  class BreakoutModule final : public gk::IModule
-  {
-  public:
-    [[nodiscard]] gk::Label RootLabel() const noexcept override;
-    [[nodiscard]] bool Startup(gk::IModuleRegistry&) noexcept override;
-    void Shutdown(gk::IModuleRegistry&) noexcept override;
-  };
 
   static gk::graphics::GraphicsConfig MakeGraphicsConfig() noexcept;
 
+  void ConfigureProfiler();
   bool CreateWindow();
   bool CreateSwapchain();
-  void ConfigureProfiler();
-  void SubscribeEvents();
 
-  void RenderFrame();
-  void Tick(f32 dt);
+  void SubscribeEvents();
+  void OnKey(gk::platform::KeyCode key);
+
   void Start();
   void Update();
-  void OnKey(gk::platform::KeyCode key);
+  void Tick(f32 dt);
+  void RenderFrame();
+
   void PrintHudIfDue(f32 drawCalls);
+
+  gk::Unique<Scene> CreateScene(SceneID id);
+  void SwitchScene(SceneID id);
 
   gk::runtime::TrackingAllocator m_Allocator;
   gk::AllocatorScope m_AllocScope {m_Allocator};
@@ -48,7 +46,6 @@ private:
   gk::runtime::RuntimeModule m_RuntimeModule;
   gk::platform::PlatformModule m_PlatformModule;
   gk::graphics::GraphicsModule m_GraphicsModule;
-  BreakoutModule m_AppModule;
 
   ::std::optional<gk::Engine> m_Engine;
   ::std::optional<gk::runtime::StandardLogSinks> m_LogSinks;
@@ -68,8 +65,8 @@ private:
   u64 m_FrameIndex = 0;
   u64 m_LastHudPrintNs = 0;
 
-  Camera m_Camera;
   Renderer m_Renderer;
 
-  std::vector<Entity*> m_Entities;
+  gk::Unique<Scene> m_Scene;
+
 };

@@ -16,6 +16,9 @@ add_executable(Breakout
   src/Camera.cpp
   src/Renderer.cpp
   src/Entity.cpp
+  src/Scenes/MainMenuScene.cpp
+  src/Scenes/GameScene.cpp
+  src/Scenes/GameOverScene.cpp
   src/overwrite_new.cpp
 )
 target_link_libraries(Breakout PRIVATE
@@ -72,6 +75,11 @@ gecko_add_shaders(
   NAMESPACE shaders
   HEADER    shaders.h
   SHADERS
-    rect.vert.hlsl=RectVert
-    rect.frag.hlsl=RectFrag
+    vertex2D.vert.hlsl=Vertex2D
+    fillRect.frag.hlsl=FillRectFrag
+    fillCircle.frag.hlsl=FillCircleFrag
+    strokeRect.frag.hlsl=StrokeRectFrag
+    strokeCircle.frag.hlsl=StrokeCircleFrag
+    fullscreen.vert.hlsl=FullscreenVert
+    fullscreen.frag.hlsl=FullscreenFrag
 )

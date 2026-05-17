@@ -1,0 +1,5 @@
+/home/brian/projects/active/Gecko_demos/Demos/001_Breakout/build_release/CMakeFiles/Breakout.dir
+/home/brian/projects/active/Gecko_demos/Demos/001_Breakout/build_release/CMakeFiles/copy_compile_commands.dir
+/home/brian/projects/active/Gecko_demos/Demos/001_Breakout/build_release/CMakeFiles/Breakout_shaders.dir
+/home/brian/projects/active/Gecko_demos/Demos/001_Breakout/build_release/CMakeFiles/edit_cache.dir
+/home/brian/projects/active/Gecko_demos/Demos/001_Breakout/build_release/CMakeFiles/rebuild_cache.dir

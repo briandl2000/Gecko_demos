@@ -1,13 +1,15 @@
 #include "Entity.h"
 #include "Renderer.h"
+#include <gecko/core/services/jobs.h>
 #include <gecko/math/aabb.h>
 #include <gecko/math/vector.h>
 #include <gecko/platform/input.h>
 #include <gecko/platform/input_codes.h>
+#include <gecko/core/utility/random.h>
 
 void Entity::Render(Renderer* renderer)
 {
-  renderer->DrawRect(Position, Color, Size, 0.);
+  renderer->FillRect(Position, Color, Size, 0.);
 }
 
 void Entity::BeginCollisionChecks()
@@ -39,14 +41,45 @@ void Entity::CheckCollision(Entity* other)
       other->Position
     });
   }
-
 }
 
 Paddle::Paddle()
 {
-  Position = {0., -4};
+  Position = {0., -3};
   Size = {1., 0.3};
-  Color = {0.4, 0.5, 0.9};
+  Color = Colors::paddle_color;
+}
+
+void Paddle::HandleCollision(const CollisionInfo& collision)
+{
+  f32 overlapX = collision.bounds.Max.X - collision.bounds.Min.X;
+  f32 overlapY = collision.bounds.Max.Y - collision.bounds.Min.Y;
+
+  gm::Aabb2 myBounds = GetBounds();
+  gm::Float2 otherPosition = collision.otherPosition;
+
+  if (overlapY < overlapX)
+  {
+    if (Position.Y < otherPosition.Y)
+    {
+      Position.Y -= overlapY;
+    }
+    else
+    {
+      Position.Y += overlapY;
+    }
+  }
+  else
+  {
+    if (Position.X < otherPosition.X)
+    {
+      Position.X -= overlapX;
+    }
+    else
+    {
+      Position.X += overlapX;
+    }
+  }
 }
 
 void Paddle::Update(f32 dt)
@@ -64,56 +97,97 @@ void Paddle::Update(f32 dt)
   {
     movement = gm::Normalized(movement);
   }
+  for(const auto collision : m_LastCollisionBounds)
+  {
+    if (collision.otherType == EntityType::Wall)
+    {
+      HandleCollision(collision);
+    }
+  }
+
   Position = Position + movement * Speed * dt;
+
 }
 
 Ball::Ball()
 {
-  Position = {0., 0.};
+  Position = {0., -1.};
   Size = {0.3, 0.3};
-  Color = {0.7, 0.4, 0.2};
+  Color = Colors::paddle_color;
   m_Velocity = {.3, -2.f};
+}
+
+void Ball::Render(Renderer* renderer)
+{
+  renderer->FillCircle(Position, Color, Size);
+}
+
+void Ball::HandleCollision(const CollisionInfo& collision)
+{
+  f32 overlapX = collision.bounds.Max.X - collision.bounds.Min.X;
+  f32 overlapY = collision.bounds.Max.Y - collision.bounds.Min.Y;
+
+  gm::Aabb2 myBounds = GetBounds();
+  gm::Float2 otherPosition = collision.otherPosition;
+
+  if (overlapY < overlapX)
+  {
+    if (Position.Y < otherPosition.Y)
+    {
+      Position.Y -= overlapY;
+    }
+    else
+    {
+      Position.Y += overlapY;
+    }
+
+    m_Velocity.Y = -m_Velocity.Y;
+  }
+  else
+  {
+    if (Position.X < otherPosition.X)
+    {
+      Position.X -= overlapX;
+    }
+    else
+    {
+      Position.X += overlapX;
+    }
+    m_Velocity.X = -m_Velocity.X;
+  }
 }
 
 void Ball::Update(f32 dt)
 {
-  for(auto collision : m_LastCollisionBounds)
+  for(const auto collision : m_LastCollisionBounds)
   {
-    if (collision.otherType == EntityType::Paddle)
-    {
-      f32 overlapX = collision.bounds.Max.X - collision.bounds.Min.X;
-      f32 overlapY = collision.bounds.Max.Y - collision.bounds.Min.Y;
-
-      gm::Aabb2 myBounds = GetBounds();
-      gm::Float2 otherPosition = collision.otherPosition;
-
-      if (overlapY < overlapX)
-      {
-        if (Position.Y < otherPosition.Y)
-        {
-          Position.Y -= overlapY;
-        }
-        else
-        {
-          Position.Y += overlapY;
-        }
-
-        m_Velocity.Y = -m_Velocity.Y;
-      }
-      else
-      {
-        if (Position.X < otherPosition.X)
-        {
-          Position.X -= overlapX;
-        }
-        else
-        {
-          Position.X += overlapX;
-        }
-        m_Velocity.X = -m_Velocity.X;
-      }
-    }
+    HandleCollision(collision);
   }
 
   Position = Position + m_Velocity * dt;
+}
+
+Brick::Brick(gm::Float2 postion)
+{
+  Position = postion;
+  Size = gm::Float2(0.5, 0.2);
+  Color = Colors::brick_normal;
+}
+
+void Brick::Update(f32 dt)
+{
+  for(const auto collision : m_LastCollisionBounds)
+  {
+    if(collision.otherType == EntityType::Ball)
+    {
+      m_IsDead = true;
+    }
+  }
+}
+
+Wall::Wall(gm::Float2 position, gm::Float2 size)
+{
+  Position = position;
+  Size = size;
+  Color = Colors::yellow;
 }

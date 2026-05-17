@@ -13,6 +13,7 @@ public:
 
   gm::Float2 Position {0., 0.};
   f32 Rotation {0.};
+  f32 Zoom {1.0};
 
 private:
   gm::Float4x4 m_Projection {};

@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/brian/projects/active/Gecko_demos/Demos/001_Breakout/build_release/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

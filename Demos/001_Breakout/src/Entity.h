@@ -12,6 +12,7 @@ enum class EntityType : u8
   Paddle,
   Ball,
   Brick,
+  Wall
 };
 
 struct CollisionInfo
@@ -29,8 +30,10 @@ public:
   virtual ~Entity() = default;
 
   virtual void Render(Renderer* renderer);
-  virtual void Update(f32 dt) = 0;
+  virtual void Update(f32 dt) {};
   virtual EntityType GetType() { return EntityType::None; }
+
+  bool IsDead() { return m_IsDead; }
 
   void BeginCollisionChecks();
   void CheckCollision(Entity* other);
@@ -43,6 +46,7 @@ public:
 
 protected:
   ::std::vector<CollisionInfo> m_LastCollisionBounds;
+  bool m_IsDead {false};
 
 private:
 };
@@ -57,6 +61,7 @@ public:
 
   f32 Speed {10.f};
 private:
+  void HandleCollision(const CollisionInfo& collision);
 
 };
 
@@ -65,18 +70,36 @@ class Ball : public Entity
 public:
   Ball();
 
+  virtual void Render(Renderer* renderer) override;
   virtual void Update(f32 dt) override;
   virtual EntityType GetType() override { return EntityType::Ball; }
 
 private:
+  void HandleCollision(const CollisionInfo& collision);
+
   gm::Float2 m_Velocity {};
 };
 
 class Brick : public Entity
 {
 public:
+  Brick() = default;
+  Brick(gm::Float2 position);
 
+  virtual void Update(f32 dt) override;
   virtual EntityType GetType() override { return EntityType::Brick; }
+
+private:
+};
+
+class Wall : public Entity
+{
+public:
+  Wall() = default;
+  Wall(gm::Float2 position, gm::Float2 size);
+
+  virtual EntityType GetType() override { return EntityType::Wall; }
+
 
 private:
 };
